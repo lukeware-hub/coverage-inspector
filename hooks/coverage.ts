@@ -66,7 +66,8 @@ export function parseChangedLines(diff: string): Map<string, Set<number>> {
   for (const line of diff.split(/\r?\n/)) {
     if (line.startsWith('+++ ')) {
       const path = line.slice(4).trim()
-      file = path === '/dev/null' ? undefined : path.replace(/^b\//, '').replace(/^"|"$/g, '')
+      // A path with a space or a non-ASCII character comes in quotes: the quotes go first, then the `b/` prefix.
+      file = path === '/dev/null' ? undefined : path.replace(/^"|"$/g, '').replace(/^b\//, '')
       if (file) changed.set(file, changed.get(file) ?? new Set())
     } else if (file && line.startsWith('@@')) {
       const hunk = /\+(\d+)(?:,(\d+))?/.exec(line)

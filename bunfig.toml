@@ -1,0 +1,4 @@
+[test]
+preload = ["./bun-tests/shim.ts"]
+coverageSkipTestFiles = true
+coveragePathIgnorePatterns = ["bun-tests/**"]

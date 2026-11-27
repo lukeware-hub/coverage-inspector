@@ -17,8 +17,6 @@ const SESSION = 'session-inspector'
 const STALE_EVERY_MS = 15_000
 // A test run started in the background is looked for until its reports show up, for at most this long.
 const BACKGROUND_WAIT_MS = 10 * 60_000
-// With no duration from the engine, reports written in this window before the end belong to the run.
-const DEFAULT_WINDOW_MS = 10 * 60_000
 const GIT_ENV = { GIT_TERMINAL_PROMPT: '0', GCM_INTERACTIVE: 'never', LC_ALL: 'C', GIT_OPTIONAL_LOCKS: '0' }
 const SHELLS = new Set(['Bash', 'PowerShell'])
 
@@ -33,14 +31,6 @@ function message(error: unknown): string {
 }
 
 const asText = (value: unknown): string => (typeof value === 'string' ? value : '')
-
-// What a shell tool printed: its response is text, or an object with stdout and stderr.
-export function outputOf(response: unknown): string {
-  if (typeof response === 'string') return response
-  if (typeof response !== 'object' || response === null) return ''
-  const fields = response as Record<string, unknown>
-  return [fields.stdout, fields.stderr, fields.output].map(asText).filter(Boolean).join('\n')
-}
 
 // Moves this mod's row right above Git Inspector's. When Git Inspector's row has not been moved yet (it moves itself above
 // Session Inspector's, and may run after this hook), this row goes above Session Inspector's, which ends in the same order.
@@ -98,7 +88,7 @@ type Block = { type?: string; id?: string; name?: string; input?: unknown; tool_
 const blocksOf = (message: { content?: unknown }): Block[] => (Array.isArray(message.content) ? (message.content as Block[]) : [])
 
 // Shell calls the model started and whose result has not come back yet, by tool_use id, with the time each started.
-const calls = new Map<string, { tool_name: string; tool_input: unknown; at: number }>()
+const calls = new Map<string, { tool_input: unknown; at: number }>()
 const MAX_CALLS = 200
 
 // What a tool_result row holds as text: its content is a string or a list of text blocks.
@@ -114,7 +104,7 @@ async function noteCalls($: EngineInterface, message: { content?: unknown }): Pr
   const at = await $.clock.now()
   for (const use of uses) {
     if (calls.size >= MAX_CALLS) calls.delete(calls.keys().next().value!)
-    calls.set(use.id!, { tool_name: use.name!, tool_input: use.input, at })
+    calls.set(use.id!, { tool_input: use.input, at })
   }
 }
 
@@ -127,7 +117,7 @@ async function endCalls($: EngineInterface, message: { content?: unknown }, extr
     // A failed shell call starts its text with "Exit code N".
     const code = /^Exit code (\d+)/i.exec(output)?.[1]
     const exitCode = result.is_error ? (code === undefined ? 1 : Number(code)) : 0
-    await onShell($, { tool_name: call.tool_name, tool_input: call.tool_input, duration_ms: (await $.clock.now()) - call.at }, { exitCode, output }, extra)
+    await onShell($, { tool_input: call.tool_input, duration_ms: (await $.clock.now()) - call.at }, { exitCode, output }, extra)
   }
 }
 
@@ -174,14 +164,13 @@ async function refreshStale($: EngineInterface): Promise<void> {
 }
 
 // A shell command that just ended: when it was a test run, its reports are read.
-async function onShell($: EngineInterface, e: { tool_name: string; tool_input: unknown; duration_ms?: number }, outcome: { exitCode?: number; output: string }, extra: readonly RegExp[]): Promise<void> {
-  if (!SHELLS.has(e.tool_name)) return
+async function onShell($: EngineInterface, e: { tool_input: unknown; duration_ms: number }, outcome: { exitCode?: number; output: string }, extra: readonly RegExp[]): Promise<void> {
   const input = (e.tool_input ?? {}) as { command?: unknown; run_in_background?: unknown }
   const command = asText(input.command)
   const detected = detectRun(command, extra)
   if (!detected) return
   const endedAt = await $.clock.now()
-  const startedAt = endedAt - (e.duration_ms ?? DEFAULT_WINDOW_MS)
+  const startedAt = endedAt - e.duration_ms
   const finished: Finished = { command: detected.command, runner: detected.runner, scope: detected.scope, startedAt, endedAt, exitCode: outcome.exitCode, output: outcome.output }
   await update($, view, current => ({ ...current, isScanning: true }))
   if (input.run_in_background === true) {
@@ -193,13 +182,16 @@ async function onShell($: EngineInterface, e: { tool_name: string; tool_input: u
 }
 
 async function checkPending($: EngineInterface): Promise<void> {
-  for (const wait of [...pending]) {
+  const waiting = [...pending]
+  for (const wait of waiting) {
     const now = await $.clock.now()
     const isLast = now >= wait.until
     const done = await enqueue(() => finish($, { ...wait.finished, endedAt: now }, { isLast, note: isLast ? 'ran in the background, results may be incomplete' : undefined }))
     if (done) pending.splice(pending.indexOf(wait), 1)
   }
-  if (!pending.length) await update($, view, current => (current.isScanning ? { ...current, isScanning: false } : current))
+  // The "reading" mark is cleared only by a check that had background runs to look at: a check with none must not
+  // switch it off while an ordinary run is being read.
+  if (waiting.length && !pending.length) await update($, view, current => (current.isScanning ? { ...current, isScanning: false } : current))
 }
 
 export const register: Register = (on, options) => {
@@ -256,7 +248,7 @@ export const register: Register = (on, options) => {
   on('tool.run', { tool: TOOL }, async $ => {
     try {
       // A run that just ended is still being read: the answer waits for it.
-      await queue.catch(() => undefined)
+      await queue
       await refreshStale($)
       return { result: JSON.stringify(await read($, view)) }
     } catch (error) {

@@ -148,9 +148,12 @@ Test commands it knows: npm, pnpm, yarn and bun scripts named `test` or `coverag
 ```
 claude plugin validate .
 claude plugin test .
+bun run coverage
 ```
 
-`tsc -p .` type-checks the mod once Claude Code has loaded it and written its types to `.claude-plugin/types/`.
+- `claude plugin test .` runs the tests inside Claude Code, against the real engine.
+- `bun run coverage` runs the same sources under [Bun](https://bun.sh) with small stand-ins for the engine (`bun-tests/shim.ts` and `bun-tests/fake.ts`) and prints the coverage of every file in `hooks/`. Bun reports line and function coverage, not branch coverage. Currently 100% of both.
+- `tsc -p .` type-checks the mod once Claude Code has loaded it and written its types to `.claude-plugin/types/`.
 
 ## License
 

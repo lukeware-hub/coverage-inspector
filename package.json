@@ -1,0 +1,9 @@
+{
+  "name": "coverage-inspector",
+  "private": true,
+  "description": "Development scripts only: the mod itself has no dependencies.",
+  "scripts": {
+    "test": "claude plugin test .",
+    "coverage": "bun test --coverage --coverage-reporter=text --coverage-reporter=lcov bun-tests hooks/parsers hooks/logic.test.ts hooks/grid.test.ts"
+  }
+}

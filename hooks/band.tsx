@@ -152,6 +152,7 @@ export function nextStep(view: CoverageView, target: number): Segment {
   if (target && lines !== undefined && lines < target) steps.push(`raise coverage from ${lines}% to ${target}%`)
   if (!last.coverage) steps.push('run with coverage on')
   if (view.staleFiles) steps.push(`run the tests again, ${plural(view.staleFiles, 'file')} changed since`)
+  if (!last.tests && !last.coverage) steps.push('make the runner write a report or print its totals')
   if (!steps.length) return { text: 'nothing to do, the tests are green', color: 'success' }
   const text = steps.length === 1 ? steps[0]! : `${steps.slice(0, -1).join(', ')}, then ${steps.at(-1)}`
   return { text, color: failed ? 'error' : 'warning' }
@@ -195,7 +196,11 @@ export function runMark(view: CoverageView): Mark {
   const { last } = view
   if (view.isScanning) return { text: '○ reading' }
   if (!last) return { text: view.error ? '● failed' : '○ waiting', color: view.error ? 'error' : undefined }
-  return last.ok ? { text: `● passed ${clock(last.endedAt)}`, color: 'success' } : { text: `● failed ${clock(last.endedAt)}`, color: 'error' }
+  if (!last.ok) return { text: `● failed ${clock(last.endedAt)}`, color: 'error' }
+  // An exit code of 0 with no test counts and no coverage proves nothing (a command line such as `npm test; echo done` always
+  // exits 0): the mark stays neutral instead of claiming a pass.
+  if (!last.tests && !last.coverage) return { text: `○ ran, no results ${clock(last.endedAt)}` }
+  return { text: `● passed ${clock(last.endedAt)}`, color: 'success' }
 }
 
 // Rows that leave first, in this order, when the band is too short for every row.

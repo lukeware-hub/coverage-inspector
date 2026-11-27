@@ -1,7 +1,7 @@
 import type { On } from 'claude-code'
 import { expect, mock, test, type TestBody } from 'claude-code/testing'
 
-import { PLUGIN, TOOL, orderRows, outputOf } from './register'
+import { PLUGIN, TOOL, orderRows } from './register'
 
 type Engine = Parameters<TestBody>[0]
 
@@ -223,10 +223,4 @@ test('the Coverage row goes right above Git Inspector, in either order the two m
   expect(names(first)).toEqual([PLUGIN, 'session-inspector', 'git-inspector'])
   expect(names(orderRows([row('git-inspector'), row(PLUGIN)]))).toEqual([PLUGIN, 'git-inspector'])
   expect(names(orderRows([row('bugs'), row(PLUGIN)]))).toEqual(['bugs', PLUGIN])
-})
-
-test('what a shell tool printed is read from a string or from stdout and stderr', () => {
-  expect(outputOf('plain')).toBe('plain')
-  expect(outputOf({ stdout: 'a', stderr: 'b' })).toBe('a\nb')
-  expect(outputOf(undefined)).toBe('')
 })
