@@ -6,6 +6,63 @@ It works with any language. It does not run your tests and does not change them:
 
 It answers at a glance: did the last run pass, how many tests failed and which one first, how much code the tests cover and whether that went up or down, whether the lines you just changed are covered, which tests are slow or flaky, and whether the figures are out of date because you edited code after the run.
 
+## Install
+
+Pick one way. All three give the same result: the mod is installed for your user and is active in every Claude Code session.
+
+### 1. Inside Claude Code (easiest)
+
+Type this one line in the Claude Code prompt. It adds the marketplace and installs the mod:
+
+```
+/plugin install coverage-inspector --marketplace lukeware-hub/coverage-inspector
+```
+
+Answer `y` if it asks to add the marketplace, then type `/reload-plugins`. The band appears above the prompt.
+
+### 2. From a terminal
+
+```
+claude plugin marketplace add lukeware-hub/coverage-inspector
+claude plugin install coverage-inspector@coverage-inspector
+```
+
+Then type `/reload-plugins` in a running Claude Code session, or just start a new one. To set the options while installing, add `--config coverageTarget=80` (see Settings).
+
+### 3. Ask Claude Code to do it
+
+Paste this to Claude Code, and it can install the mod by itself:
+
+> Install the Claude Code mod "Coverage Inspector" from GitHub. Run `claude plugin marketplace add lukeware-hub/coverage-inspector`, then `claude plugin install coverage-inspector@coverage-inspector`, then `claude plugin list` and confirm that `coverage-inspector@coverage-inspector` shows `Status: enabled`. Finally tell me to type `/reload-plugins`.
+
+For an agent reading this file: these are the only steps. The commands need no extra flags, no files to edit and no build step. The mod has no runtime dependencies, uses no network and needs Claude Code with plugin support (a version that has `claude plugin`).
+
+### Check that it works
+
+1. `claude plugin list` shows `coverage-inspector@coverage-inspector`, `Status: enabled`.
+2. In a project, ask Claude Code to run your tests (for example `npm test`, `pytest` or `go test ./...`).
+3. When the tests end, the band **Coverage Inspector** appears above the Git Inspector band with the result. Before any test run it says "no test run yet, the band reads each run the agent makes": that is normal.
+4. For real coverage numbers, run the tests with coverage on (see How a run is captured).
+
+### Update, change options, remove
+
+```
+claude plugin marketplace update coverage-inspector
+claude plugin update coverage-inspector@coverage-inspector
+claude plugin uninstall coverage-inspector
+```
+
+An update takes effect after a restart of Claude Code. To change the options later, type `/plugin configure coverage-inspector@coverage-inspector` in Claude Code.
+
+### If something goes wrong
+
+- **The band does not show:** type `/reload-plugins`, then check `claude plugin list`. The band needs a terminal at least 5 rows tall; below that it hides the frame and keeps the rows.
+- **"Marketplace file not found" or "not found in marketplace":** run the `marketplace add` line first, and check you typed `lukeware-hub/coverage-inspector` exactly.
+- **The band says "no coverage report":** your test run did not write a report. Turn coverage on in your runner (`--coverage`, `--cov`, `-coverprofile`).
+- **Nothing happens after a test run:** the command may not be on the built-in list. Add it in the `testCommands` option, for example `make verify`.
+- **The band appears twice or a row repeats:** you have the mod loaded from two places. Keep one, then `/reload-plugins`.
+- **To try it from a local copy without installing:** `claude --plugin-dir .` inside the repository folder.
+
 ## What it adds
 
 - **A band above the prompt**, drawn like the Session Inspector and Git Inspector bands and stacked right above Git Inspector. In the terminal it is one bordered table; on the desktop, rows of cards. When the band is too short, `Trend`, `Slow`, `Flaky` and `Command` leave first.
@@ -85,20 +142,6 @@ Test commands it knows: npm, pnpm, yarn and bun scripts named `test` or `coverag
 - A command that starts tests in the background is looked for until its reports appear, for up to ten minutes.
 - It looks at most seven folders deep, skips `node_modules`, `.git`, `vendor`, virtual environments and build caches, and reads at most the 40 newest reports of a run.
 - Per-test history (for flaky tests) keeps the last ten results of at most 300 tests that ever failed.
-
-## Install
-
-In the Claude Code terminal:
-
-```
-/plugin install coverage-inspector --marketplace lukeware-hub/coverage-inspector
-```
-
-To try it from a local copy without installing:
-
-```
-claude --plugin-dir .
-```
 
 ## Development
 
