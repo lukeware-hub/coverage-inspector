@@ -1,10 +1,18 @@
 {
   "name": "coverage-inspector",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A band above the Git Inspector band with the health of the project's tests: last run, passed and failed, coverage and its trend, coverage of the changed lines, failing and flaky tests, and the next step. Works with any language.",
-  "author": { "name": "lukeware-hub" },
+  "author": {
+    "name": "lukeware-hub"
+  },
   "license": "MIT",
-  "keywords": ["tests", "coverage", "qa", "lcov", "junit"],
+  "keywords": [
+    "tests",
+    "coverage",
+    "qa",
+    "lcov",
+    "junit"
+  ],
   "types": "./types/index.d.ts",
   "userConfig": {
     "testCommands": {
@@ -19,5 +27,6 @@
       "description": "Line coverage the project should reach. The band turns the figure to a warning below it. 0 turns the target off.",
       "default": 0
     }
-  }
+  },
+  "icon": "./.claude-plugin/icon.png"
 }

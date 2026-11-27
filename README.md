@@ -10,6 +10,8 @@ It answers at a glance: did the last run pass, how many tests failed and which o
 
 - **A band above the prompt**, drawn like the Session Inspector and Git Inspector bands and stacked right above Git Inspector. In the terminal it is one bordered table; on the desktop, rows of cards. When the band is too short, `Trend`, `Slow`, `Flaky` and `Command` leave first.
 
+  An illustration of the layout (column widths adapt to the terminal):
+
   ```
   ╭────────────────────────────────────────────────────────────────────────────────╮
   │ Coverage Inspector                                    vitest   ● failed 14:02 │
