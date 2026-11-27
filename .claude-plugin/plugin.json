@@ -1,6 +1,6 @@
 {
   "name": "coverage-inspector",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "A band above the Git Inspector band with the health of the project's tests: last run, passed and failed, coverage and its trend, coverage of the changed lines, failing and flaky tests, and the next step. Works with any language.",
   "author": {
     "name": "lukeware-hub"

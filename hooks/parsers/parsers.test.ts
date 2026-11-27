@@ -93,5 +93,9 @@ test('summary lines of the common runners', () => {
   expect(parseSummaryOutput('ok  \texample.com/m/a\t0.1s\nFAIL\texample.com/m/b\t0.2s')).toEqual({ total: 2, passed: 1, failed: 1, skipped: 0 })
   expect(parseSummaryOutput('5 examples, 1 failure, 1 pending')).toEqual({ total: 5, passed: 3, failed: 1, skipped: 1 })
   expect(parseSummaryOutput('Tests run: 5, Failures: 1, Errors: 1, Skipped: 1')).toEqual({ total: 5, passed: 2, failed: 2, skipped: 1 })
+  // Bun prints "N pass", "N skip", "N fail" and "N error" on their own lines; an error between tests counts as a failure.
+  expect(parseSummaryOutput(' 27 pass\n 1 skip\n 4 fail\n 128 expect() calls\nRan 32 tests across 6 files. [91.00ms]')).toEqual({ total: 32, passed: 27, failed: 4, skipped: 1 })
+  expect(parseSummaryOutput(' 5 pass\n 0 fail\nRan 5 tests across 1 file. [5.00ms]')).toEqual({ total: 5, passed: 5, failed: 0, skipped: 0 })
+  expect(parseSummaryOutput(' 5 pass\n 1 error\nRan 5 tests across 1 file. [5.00ms]')).toEqual({ total: 5, passed: 5, failed: 1, skipped: 0 })
   expect(parseSummaryOutput('nothing useful here')).toBeUndefined()
 })

@@ -63,6 +63,12 @@ export function parseSummaryOutput(output: string): TestCounts | undefined {
   // .NET: "Passed!  - Failed: 0, Passed: 5, Skipped: 0, Total: 5".
   const dotnet = /(?:Passed|Failed)!\s+-\s+Failed:\s*(\d+),\s*Passed:\s*(\d+),\s*Skipped:\s*(\d+),\s*Total:\s*(\d+)/.exec(text)
   if (dotnet) return { total: Number(dotnet[4]), passed: Number(dotnet[2]), failed: Number(dotnet[1]), skipped: Number(dotnet[3]) }
+  // Bun: " 27 pass", " 1 skip", " 4 fail", " 1 error" on their own lines, then "Ran 32 tests across 6 files."
+  const bun = /^Ran (\d+) tests? across/m.exec(text)
+  if (bun) {
+    const failed = n(/^\s*(\d+) fail\s*$/m) + n(/^\s*(\d+) errors?\s*$/m)
+    return { total: Number(bun[1]), passed: n(/^\s*(\d+) pass\s*$/m), failed, skipped: n(/^\s*(\d+) skip\s*$/m) }
+  }
   // Go: one "ok" or "FAIL" line per package; the counts are packages, which is all `go test` prints without -v.
   const goOk = [...text.matchAll(/^ok\s+\S+/gm)].length
   const goFail = [...text.matchAll(/^FAIL\s+\S+/gm)].length

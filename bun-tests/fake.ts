@@ -13,6 +13,7 @@ export type Fake = {
   stored: Map<string, unknown>
   time: { now: number }
   timers: (() => unknown)[]
+  intervals: number[]
   git: { diff?: string; status?: string; failing?: boolean; throwing?: boolean }
   repo: { root: string } | null
   calls: { command: string[]; tool: string[]; process: string[] }
@@ -29,6 +30,7 @@ export function makeFake(files: Record<string, FakeFile> = {}): Fake {
     stored: new Map(),
     time: { now: NOW },
     timers: [],
+    intervals: [],
     git: {},
     repo: { root: ROOT },
     calls: { command: [], tool: [], process: [] },
@@ -61,7 +63,10 @@ export function makeFake(files: Record<string, FakeFile> = {}): Fake {
         if (fake.failures.clock) throw new Error('clock is gone')
         return fake.time.now
       },
-      every: (_: number, tick: () => unknown) => void fake.timers.push(tick),
+      every: (ms: number, tick: () => unknown) => {
+        fake.intervals.push(ms)
+        fake.timers.push(tick)
+      },
     },
     fs: {
       list: async (path: string) => {

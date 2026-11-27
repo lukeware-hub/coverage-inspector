@@ -47,6 +47,7 @@ describe('session start', () => {
     expect(b.fake.calls.command).toEqual(['coverage'])
     expect(b.fake.calls.tool).toEqual(['coverage_status'])
     expect(b.fake.timers).toHaveLength(1)
+    expect(b.fake.intervals).toEqual([10_000])
     expect(viewOf()).toBeUndefined()
     b.fake.timers[0]!()
     await settle()
@@ -163,6 +164,17 @@ describe('reading the conversation rows', () => {
   })
 })
 
+describe('subagents', () => {
+  test('a test run by a subagent is read like the main agent\'s', async () => {
+    const b = boot(reports())
+    const id = `toolu_${++ids}`
+    const origin = { kind: 'model', model: 'm' }
+    await b.fire(b.fake, 'session.append', { door: 'response' }, { door: 'response', origin, uuid: `u${++ids}`, agentId: 'sub', message: { type: 'assistant', content: [{ type: 'tool_use', id, name: 'Bash', input: { command: 'npm test' } }] } })
+    await b.fire(b.fake, 'session.append', { door: 'tool-result' }, { door: 'tool-result', origin, uuid: `u${++ids}`, agentId: 'sub', message: { type: 'user', content: [{ type: 'tool_result', tool_use_id: id, content: '' }] } })
+    expect(viewOf().last).toMatchObject({ runner: 'npm test', ok: false })
+  })
+})
+
 describe('background runs', () => {
   test('are looked for until the reports show up', async () => {
     const b = boot()
@@ -180,6 +192,27 @@ describe('background runs', () => {
     await settle()
     expect(viewOf().last).toMatchObject({ runner: 'npm test', coverage: { lines: 33.3 } })
     expect(viewOf().isScanning).toBe(false)
+  })
+
+  test('their output file says whether the tests failed, since the exit code is never seen', async () => {
+    const out = '/tmp/task.output'
+    const b = boot({ [out]: file(' 3 pass\n 2 fail\nRan 5 tests across 1 file. [5.00ms]', NOW + 5000), [`${ROOT}/lcov.info`]: file(LCOV, NOW + 5000) })
+    await b.fire(b.fake, 'session.start', undefined, { cwd: ROOT })
+    await shell(b, 'bun test', { background: true, text: `Command running in background with ID: abc. Output is being written to: ${out}` })
+    b.fake.time.now = NOW + 15_000
+    await b.fake.timers[0]!()
+    await settle()
+    expect(viewOf().last).toMatchObject({ runner: 'bun test', ok: false, tests: { total: 5, failed: 2 } })
+  })
+
+  test('an output file that cannot be read leaves the result as it was', async () => {
+    const b = boot({ [`${ROOT}/lcov.info`]: file(LCOV, NOW + 5000) })
+    await b.fire(b.fake, 'session.start', undefined, { cwd: ROOT })
+    await shell(b, 'bun test', { background: true, text: 'Output is being written to: /tmp/missing.output' })
+    b.fake.time.now = NOW + 15_000
+    await b.fake.timers[0]!()
+    await settle()
+    expect(viewOf().last).toMatchObject({ runner: 'bun test', ok: true })
   })
 
   test('are given up on after ten minutes, with what was found', async () => {
