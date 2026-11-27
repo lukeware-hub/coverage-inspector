@@ -35,10 +35,34 @@ function unquoted(command: string): string {
   return command.replace(/"(?:[^"\\]|\\.)*"|'[^']*'/g, '""')
 }
 
+// A here-document's body is text handed to a command, not commands: `git commit -F - <<'EOF'` followed by a message
+// that mentions `npm test; echo done` runs no test. Each body is removed, up to the line that holds its delimiter alone
+// (or to the end when that line never comes).
+export function withoutHeredocs(command: string): string {
+  const lines = command.split('\n')
+  const kept: string[] = []
+  const open: string[] = []
+  for (const line of lines) {
+    if (open.length) {
+      if (line.replace(/^\t+/, '').trim() === open[0]) open.shift()
+      continue
+    }
+    kept.push(line)
+    for (const match of unquotedOutsideHeredoc(line).matchAll(/<<-?\s*(['"]?)([\w.-]+)\1/g)) open.push(match[2]!)
+  }
+  return kept.join('\n')
+}
+
+// A line with its quoted text blanked, so `echo "<<EOF"` opens no here-document. Here-string `<<<` is not one either.
+function unquotedOutsideHeredoc(line: string): string {
+  return line.replace(/"(?:[^"\\]|\\.)*"|'[^']*'/g, match => (/^(['"])[\w.-]+\1$/.test(match) ? match : '""')).replace(/<<</g, '')
+}
+
 // The parts of a compound command that run something: `cd app && npm test | tee out` is `cd app`, `npm test`, `tee out`.
 // Separators inside quotes do not split. Each part keeps its text as typed, and a plain form with the quoted text
 // removed and leading `NAME=value` assignments dropped, which is what the runner patterns read.
-export function parts(command: string): { typed: string; plain: string }[] {
+export function parts(line: string): { typed: string; plain: string }[] {
+  const command = withoutHeredocs(line)
   const pieces: string[] = []
   let current = ''
   let quote: string | undefined

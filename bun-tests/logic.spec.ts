@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 
 import type { RunRecord, Stored } from '../types'
 import { mergeCoverage, normalize, parseChangedLines, patchCoverage, samePath, summarize } from '../hooks/coverage'
-import { detectRun, parts, scopeOf, userPatterns } from '../hooks/detect'
+import { detectRun, parts, scopeOf, userPatterns, withoutHeredocs } from '../hooks/detect'
 import { attrs, decode, elements, tags } from '../hooks/parsers/xml'
 import { addRun, buildRun, flakyTests, isFlaky } from '../hooks/run'
 import { findReports, kindOf, readReports } from '../hooks/scan'
@@ -26,6 +26,18 @@ describe('command detection', () => {
     expect(parts("echo 'it\\'s' ; ls").length).toBeGreaterThan(0)
     expect(parts('   ')).toEqual([])
     expect(parts('FOO=1 BAR=2 pytest')[0]!.plain).toBe('pytest')
+  })
+
+  test('here-document bodies are text, not commands', () => {
+    const commit = "git add -A && git commit -q -F - <<'EOF'\nfix: no green pass for `npm test; echo done`\n\nmore text\nEOF\ngit push"
+    expect(detectRun(commit)).toBeUndefined()
+    expect(withoutHeredocs(commit)).toBe("git add -A && git commit -q -F - <<'EOF'\ngit push")
+    expect(detectRun('cat <<EOF > notes.txt\nnpm test\nEOF\nnpm test')?.command).toBe('npm test')
+    expect(detectRun('cat <<-"END"\n\tpytest\n\tEND\ngo test ./...')?.runner).toBe('go test')
+    expect(detectRun('cat <<EOF\nnpm test\n(never closed)')).toBeUndefined()
+    expect(detectRun('cat <<A <<B\nnpm test\nA\npytest\nB\ncargo test')?.runner).toBe('cargo')
+    expect(detectRun('echo "<<EOF"\nnpm test')?.runner).toBe('npm test')
+    expect(detectRun('cat <<< "npm test"\nnpm test')?.runner).toBe('npm test')
   })
 
   test('what counts as a test run', () => {
