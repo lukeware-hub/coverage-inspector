@@ -1,0 +1,6 @@
+{
+  "name": "coverage-inspector",
+  "owner": { "name": "lukeware-hub" },
+  "metadata": { "description": "Claude Code mods by lukeware-hub." },
+  "plugins": [{ "name": "coverage-inspector", "source": "./" }]
+}
