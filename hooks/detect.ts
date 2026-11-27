@@ -7,8 +7,9 @@ const RUNNERS: { name: string; pattern: RegExp }[] = [
   { name: 'mocha', pattern: /\bmocha\b/ },
   { name: 'playwright', pattern: /\bplaywright\s+test\b/ },
   { name: 'cypress', pattern: /\bcypress\s+run\b/ },
-  { name: 'npm test', pattern: /\b(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?(?:test|t|tests|coverage|cov|test:[\w:-]+|coverage:[\w:-]+)\b/ },
+  // Bun's own runner comes first: `bun test` would otherwise match the package-script pattern below.
   { name: 'bun test', pattern: /\bbun\s+test\b/ },
+  { name: 'npm test', pattern: /\b(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?(?:test|t|tests|coverage|cov|test:[\w:-]+|coverage:[\w:-]+)\b/ },
   { name: 'deno test', pattern: /\bdeno\s+test\b/ },
   { name: 'pytest', pattern: /\bpy\.?test\b|\bpython[\d.]*\s+-m\s+(?:pytest|unittest)\b|\bcoverage\s+run\b|\btox\b|\bnox\b/ },
   { name: 'go test', pattern: /\bgo\s+test\b/ },

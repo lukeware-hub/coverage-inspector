@@ -23,6 +23,8 @@ test('only the part of a compound command that ran the tests is kept, as typed, 
 })
 
 test('a run of the whole project is full, a slice of it is partial', () => {
+  expect(detectRun('bun test --coverage')?.runner).toBe('bun test')
+  expect(detectRun('bun run test')?.runner).toBe('npm test')
   expect(detectRun('npm test')?.scope).toBe('full')
   expect(detectRun('go test ./...')?.scope).toBe('full')
   expect(detectRun('pytest')?.scope).toBe('full')

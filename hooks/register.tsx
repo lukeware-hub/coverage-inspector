@@ -14,7 +14,7 @@ export const TOOL = 'mcp__coverage-inspector__coverage_status'
 const GIT = 'git-inspector'
 const SESSION = 'session-inspector'
 // How often the band checks whether files changed after the last run.
-const STALE_EVERY_MS = 15_000
+export const STALE_EVERY_MS = 10_000
 // A test run started in the background is looked for until its reports show up, for at most this long.
 const BACKGROUND_WAIT_MS = 10 * 60_000
 const GIT_ENV = { GIT_TERMINAL_PROMPT: '0', GCM_INTERACTIVE: 'never', LC_ALL: 'C', GIT_OPTIONAL_LOCKS: '0' }
@@ -121,7 +121,10 @@ async function endCalls($: EngineInterface, message: { content?: unknown }, extr
   }
 }
 
-type Pending = { finished: Finished; until: number }
+// A background run never shows its exit code, but its launch answer names the file that collects what it prints.
+type Pending = { finished: Finished; until: number; outputFile?: string }
+
+const outputFileOf = (text: string): string | undefined => /Output is being written to:\s*(.+?)\s*$/m.exec(text)?.[1]
 
 const pending: Pending[] = []
 // Runs are read one at a time, so two test commands that end together do not write the project's history over each other.
@@ -175,7 +178,7 @@ async function onShell($: EngineInterface, e: { tool_input: unknown; duration_ms
   await update($, view, current => ({ ...current, isScanning: true }))
   if (input.run_in_background === true) {
     // The command has only been started: its tests are still running, so the reports are looked for until they appear.
-    pending.push({ finished: { ...finished, exitCode: undefined, output: undefined }, until: endedAt + BACKGROUND_WAIT_MS })
+    pending.push({ finished: { ...finished, exitCode: undefined, output: undefined }, until: endedAt + BACKGROUND_WAIT_MS, outputFile: outputFileOf(outcome.output) })
     return
   }
   await enqueue(() => finish($, finished, { isLast: true }))
@@ -186,7 +189,8 @@ async function checkPending($: EngineInterface): Promise<void> {
   for (const wait of waiting) {
     const now = await $.clock.now()
     const isLast = now >= wait.until
-    const done = await enqueue(() => finish($, { ...wait.finished, endedAt: now }, { isLast, note: isLast ? 'ran in the background, results may be incomplete' : undefined }))
+    const output = wait.outputFile ? await $.fs.read(wait.outputFile).catch(() => undefined) : undefined
+    const done = await enqueue(() => finish($, { ...wait.finished, endedAt: now, output }, { isLast, note: isLast ? 'ran in the background, results may be incomplete' : undefined }))
     if (done) pending.splice(pending.indexOf(wait), 1)
   }
   // The "reading" mark is cleared only by a check that had background runs to look at: a check with none must not
