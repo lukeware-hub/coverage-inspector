@@ -2,7 +2,7 @@
 
 ## What the mod does
 
-Coverage Inspector reads the test reports a test run leaves in the project and a few facts from git. It never changes a project file, a branch, a commit or the working tree, never runs your tests, and never blocks or changes any tool call: it listens to a command after the command ended.
+Coverage Inspector reads the test reports a test run leaves in the project and a few facts from git. It never changes a project file, a branch, a commit or the working tree, never runs your tests, and never blocks or changes any tool call: it reads the conversation rows of a command after the command ended.
 
 ## What it keeps
 

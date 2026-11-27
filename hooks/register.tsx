@@ -93,6 +93,44 @@ async function countStale($: EngineInterface, root: string, since: number): Prom
   return stale
 }
 
+type Block = { type?: string; id?: string; name?: string; input?: unknown; tool_use_id?: string; is_error?: boolean; content?: unknown; text?: string }
+
+const blocksOf = (message: { content?: unknown }): Block[] => (Array.isArray(message.content) ? (message.content as Block[]) : [])
+
+// Shell calls the model started and whose result has not come back yet, by tool_use id, with the time each started.
+const calls = new Map<string, { tool_name: string; tool_input: unknown; at: number }>()
+const MAX_CALLS = 200
+
+// What a tool_result row holds as text: its content is a string or a list of text blocks.
+function resultText(content: unknown): string {
+  if (typeof content === 'string') return content
+  if (!Array.isArray(content)) return ''
+  return (content as Block[]).map(block => asText(block.text)).filter(Boolean).join('\n')
+}
+
+async function noteCalls($: EngineInterface, message: { content?: unknown }): Promise<void> {
+  const uses = blocksOf(message).filter(block => block.type === 'tool_use' && block.id && SHELLS.has(block.name ?? ''))
+  if (!uses.length) return
+  const at = await $.clock.now()
+  for (const use of uses) {
+    if (calls.size >= MAX_CALLS) calls.delete(calls.keys().next().value!)
+    calls.set(use.id!, { tool_name: use.name!, tool_input: use.input, at })
+  }
+}
+
+async function endCalls($: EngineInterface, message: { content?: unknown }, extra: readonly RegExp[]): Promise<void> {
+  for (const result of blocksOf(message).filter(block => block.type === 'tool_result' && block.tool_use_id)) {
+    const call = calls.get(result.tool_use_id!)
+    if (!call) continue
+    calls.delete(result.tool_use_id!)
+    const output = resultText(result.content)
+    // A failed shell call starts its text with "Exit code N".
+    const code = /^Exit code (\d+)/i.exec(output)?.[1]
+    const exitCode = result.is_error ? (code === undefined ? 1 : Number(code)) : 0
+    await onShell($, { tool_name: call.tool_name, tool_input: call.tool_input, duration_ms: (await $.clock.now()) - call.at }, { exitCode, output }, extra)
+  }
+}
+
 type Pending = { finished: Finished; until: number }
 
 const pending: Pending[] = []
@@ -182,14 +220,21 @@ export const register: Register = (on, options) => {
     return next(e)
   }).catch(($, e, next) => next(e))
 
-  on('classic.PostToolUse', async ($, e, next) => {
-    await onShell($, e, { exitCode: 0, output: outputOf(e.tool_response) }, extra)
+  // The agent's shell calls are read from the conversation's rows, after the fact: the tool_use row says what ran, the
+  // tool_result row how it ended. A hook in front of Bash itself would switch off its background mode and live output, and
+  // a security plugin above this mod skips the classic PostToolUse hooks, so the rows are what is left to watch.
+  on('session.append', { door: 'response' }, async ($, e, next) => {
+    await noteCalls($, e.message)
     return next(e)
   }).catch(($, e, next) => next(e))
 
-  on('classic.PostToolUseFailure', async ($, e, next) => {
-    const code = /Exit code (\d+)/i.exec(e.error)?.[1]
-    await onShell($, e, { exitCode: code === undefined ? 1 : Number(code), output: e.error }, extra)
+  on('session.append', { door: 'tool-result' }, async ($, e, next) => {
+    // A failure here must show on the band, not vanish: the engine would only skip the hook.
+    try {
+      await endCalls($, e.message, extra)
+    } catch (error) {
+      await update($, view, current => ({ ...current, isScanning: false, error: `could not read the test run: ${message(error)}` }))
+    }
     return next(e)
   }).catch(($, e, next) => next(e))
 
@@ -210,6 +255,8 @@ export const register: Register = (on, options) => {
 
   on('tool.run', { tool: TOOL }, async $ => {
     try {
+      // A run that just ended is still being read: the answer waits for it.
+      await queue.catch(() => undefined)
       await refreshStale($)
       return { result: JSON.stringify(await read($, view)) }
     } catch (error) {

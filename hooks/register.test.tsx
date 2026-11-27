@@ -53,8 +53,6 @@ function stubEngine(on: On, host: Host) {
   on('tool.register', (_, e) => ({ value: { tool: `mcp__coverage-inspector__${e.name}` } }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('turn.complete', (_, e) => ({ text: e.answer }))
-  on('classic.PostToolUse', () => ({}))
-  on('classic.PostToolUseFailure', () => ({}))
   return { clock }
 }
 
@@ -69,11 +67,24 @@ async function start($: Engine) {
   await $.session.start({ cwd: ROOT, surface: 'terminal', isInteractive: true })
 }
 
-// The agent's test command ends: the engine tells the classic hook.
-async function testRun($: Engine, command: string, overrides: { error?: string; response?: unknown; background?: boolean } = {}) {
-  const base = { tool_name: 'Bash', tool_input: { command, ...(overrides.background ? { run_in_background: true } : {}) }, tool_use_id: 't1', duration_ms: 3000 }
-  if (overrides.error !== undefined) await $.classic.PostToolUseFailure({ ...base, error: overrides.error })
-  else await $.classic.PostToolUse({ ...base, tool_response: overrides.response ?? { stdout: '', stderr: '' } })
+// The agent's test command ends: the conversation keeps the tool_use row, then the tool_result row.
+let calls = 0
+async function testRun($: Engine, command: string, overrides: { error?: string; response?: { stdout?: string }; background?: boolean } = {}) {
+  const id = `toolu_${++calls}`
+  const origin = { kind: 'model', model: 'm' } as const
+  await $.session.append({
+    door: 'response',
+    origin,
+    uuid: `a${id}`,
+    message: { type: 'assistant', role: 'assistant', content: [{ type: 'tool_use', id, name: 'Bash', input: { command, ...(overrides.background ? { run_in_background: true } : {}) } }] },
+  })
+  const text = overrides.error ?? overrides.response?.stdout ?? ''
+  await $.session.append({
+    door: 'tool-result',
+    origin,
+    uuid: `r${id}`,
+    message: { type: 'user', role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content: text, is_error: overrides.error !== undefined }] },
+  })
 }
 
 // The value painted right after a dim cell label, such as "lines" then "66.7%".

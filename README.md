@@ -36,7 +36,7 @@ It answers at a glance: did the last run pass, how many tests failed and which o
 
 ## How a run is captured
 
-1. The agent runs a command through the Bash or PowerShell tool. When the command is a test run, the mod notices after it ends (it never sits in front of the tool, so Bash keeps its live output and its background mode).
+1. The agent runs a command through the Bash or PowerShell tool. The mod watches the conversation rows (the tool_use row, then the tool_result row), so it never sits in front of the tool: Bash keeps its live output and its background mode.
 2. The mod looks under the repository for report files written during the run and reads them:
 
    | Kind | Files | Written by |
