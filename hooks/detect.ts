@@ -36,11 +36,48 @@ function unquoted(command: string): string {
 }
 
 // The parts of a compound command that run something: `cd app && npm test | tee out` is `cd app`, `npm test`, `tee out`.
-function parts(command: string): string[] {
-  return unquoted(command)
-    .split(/&&|\|\||;|\||\n/)
-    .map(part => part.replace(/^\s*(?:\w+=\S*\s+)+/, '').trim())
+// Separators inside quotes do not split. Each part keeps its text as typed, and a plain form with the quoted text
+// removed and leading `NAME=value` assignments dropped, which is what the runner patterns read.
+export function parts(command: string): { typed: string; plain: string }[] {
+  const pieces: string[] = []
+  let current = ''
+  let quote: string | undefined
+  for (let at = 0; at < command.length; at++) {
+    const char = command[at]!
+    if (quote) {
+      if (char === '\\' && quote === '"') {
+        current += char + (command[at + 1] ?? '')
+        at++
+        continue
+      }
+      if (char === quote) quote = undefined
+      current += char
+      continue
+    }
+    if (char === '"' || char === "'") {
+      quote = char
+      current += char
+      continue
+    }
+    const two = command.slice(at, at + 2)
+    if (two === '&&' || two === '||') {
+      pieces.push(current)
+      current = ''
+      at++
+      continue
+    }
+    if (char === ';' || char === '|' || char === '\n') {
+      pieces.push(current)
+      current = ''
+      continue
+    }
+    current += char
+  }
+  pieces.push(current)
+  return pieces
+    .map(piece => piece.trim())
     .filter(Boolean)
+    .map(typed => ({ typed, plain: unquoted(typed).replace(/^\s*(?:\w+=\S*\s+)+/, '').trim() }))
 }
 
 // The user's extra patterns: comma-separated regular expressions; one that is not valid is left out.
@@ -58,7 +95,8 @@ export function userPatterns(text: string): RegExp[] {
     })
 }
 
-export type Detected = { runner: string; scope: RunScope }
+// The runner, the scope guess, and `command`: only the part of the shell line that ran the tests, as typed.
+export type Detected = { runner: string; scope: RunScope; command: string }
 
 // Flags and arguments that narrow a run to some tests: a name filter or a file or folder other than the whole project.
 const FILTER_FLAG = /\s(?:-k|-m|-t|-run|--run|--grep|-g|--filter|--testNamePattern|--testPathPattern|--tests|--testNameFilter|-Dtest=\S*|--test-name-pattern|--only|--specs?|--changed(?:Since)?|--findRelatedTests|-o|--onlyChanged|-x|--exitfirst|--lf|--last-failed|--ff)\b/
@@ -73,12 +111,12 @@ export function scopeOf(part: string): RunScope {
 // The runner a command starts, or undefined when it is not a test run.
 export function detectRun(command: string, extra: readonly RegExp[] = []): Detected | undefined {
   if (!command.trim()) return undefined
-  for (const part of parts(command)) {
-    if (NOT_A_RUN.test(part) || ONLY_INFO.test(` ${part}`)) continue
-    const known = RUNNERS.find(runner => runner.pattern.test(part))
-    if (known) return { runner: known.name, scope: scopeOf(part) }
-    const custom = extra.find(pattern => pattern.test(part))
-    if (custom) return { runner: part.split(/\s+/)[0] ?? 'custom', scope: scopeOf(part) }
+  for (const { typed, plain } of parts(command)) {
+    if (NOT_A_RUN.test(plain) || ONLY_INFO.test(` ${plain}`)) continue
+    const known = RUNNERS.find(runner => runner.pattern.test(plain))
+    if (known) return { runner: known.name, scope: scopeOf(plain), command: typed }
+    const custom = extra.find(pattern => pattern.test(plain))
+    if (custom) return { runner: plain.split(/\s+/)[0] ?? 'custom', scope: scopeOf(plain), command: typed }
   }
   return undefined
 }

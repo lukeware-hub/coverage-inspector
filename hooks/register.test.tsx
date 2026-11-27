@@ -97,9 +97,14 @@ const FRESH = NOW - 1000
 test('a test run with reports shows tests, coverage, the changed lines, the slowest test and the next step', async ($, on) => {
   stubEngine(on, { files: { [`${ROOT}/coverage/lcov.info`]: { text: LCOV, mtimeMs: FRESH }, [`${ROOT}/reports/junit.xml`]: { text: JUNIT, mtimeMs: FRESH } } })
   await start($)
-  await testRun($, 'npm test', { error: 'Exit code 1\nTests: 1 failed' })
+  await testRun($, 'cd /work/app && npm test 2>&1 | tail -5; echo; head -8 lcov.info', { error: 'Exit code 1\nTests: 1 failed' })
   for (const surface of ['terminal', 'desktop'] as const) {
     const lines = await bandLines($, surface)
+    // The Command row shows the test part alone, and the Run and Coverage rows fill all four columns.
+    expect(lines).toContain('npm test 2>&1')
+    expect(lines.some(line => line.includes('head -8'))).toBe(false)
+    expect(cellAfter(lines, 'reports')).toBe('2')
+    expect(cellAfter(lines, 'target')).toBe('off')
     for (const text of ['Coverage Inspector', 'npm test', 'Run', 'Tests', 'Coverage', 'Patch', 'Failing', 's > bad', 'Slow', 'Next']) expect(lines).toContain(text)
     expect(cellAfter(lines, 'total')).toBe('2')
     expect(cellAfter(lines, 'failed')).toBe('1')

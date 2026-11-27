@@ -57,6 +57,8 @@ function runRow(last: RunRecord): GridRow {
       { label: 'runner', text: last.runner },
       { label: 'took', text: duration(last.durationMs) },
       { label: 'scope', text: last.scope, dim: last.scope === 'full', color: last.scope === 'partial' ? 'warning' : undefined },
+      // Four figures, like the Tests row, so no cell of the table is left blank.
+      { label: 'reports', text: String(last.reports), dim: !last.reports, color: last.reports ? undefined : 'warning', optional: true },
     ],
   }
 }
@@ -81,7 +83,7 @@ function coverageRow(last: RunRecord, target: number): GridRow {
   const lines: Segment = { label: 'lines', text: percent(coverage.lines), color: levelColor(coverage.lines, target), bold: true, more: deltaPart(last) }
   const missing = (label: string, value: number | undefined): Segment => ({ label, text: percent(value), dim: value === undefined })
   const cells = [lines, missing('branches', coverage.branches), missing('functions', coverage.functions)]
-  if (target) cells.push({ label: 'target', text: `${target}%`, dim: true, optional: true })
+  cells.push({ label: 'target', text: target ? `${target}%` : 'off', dim: true, optional: true })
   return { label: 'Coverage', cells }
 }
 

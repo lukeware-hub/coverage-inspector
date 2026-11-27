@@ -182,7 +182,7 @@ async function onShell($: EngineInterface, e: { tool_name: string; tool_input: u
   if (!detected) return
   const endedAt = await $.clock.now()
   const startedAt = endedAt - (e.duration_ms ?? DEFAULT_WINDOW_MS)
-  const finished: Finished = { command, runner: detected.runner, scope: detected.scope, startedAt, endedAt, exitCode: outcome.exitCode, output: outcome.output }
+  const finished: Finished = { command: detected.command, runner: detected.runner, scope: detected.scope, startedAt, endedAt, exitCode: outcome.exitCode, output: outcome.output }
   await update($, view, current => ({ ...current, isScanning: true }))
   if (input.run_in_background === true) {
     // The command has only been started: its tests are still running, so the reports are looked for until they appear.

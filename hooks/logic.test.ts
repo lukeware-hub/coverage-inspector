@@ -16,6 +16,12 @@ test('test commands of many languages are detected, other commands are not', () 
   }
 })
 
+test('only the part of a compound command that ran the tests is kept, as typed, and quotes do not split it', () => {
+  expect(detectRun('mkdir -p /c/demo && cd /c/demo && npm test 2>&1 | tail -8; echo; head -8 lcov.info')?.command).toBe('npm test 2>&1')
+  expect(detectRun('cd app; FOO=1 pytest -k "a; b"')?.command).toBe('FOO=1 pytest -k "a; b"')
+  expect(detectRun('echo "npm test" && ls')).toBeUndefined()
+})
+
 test('a run of the whole project is full, a slice of it is partial', () => {
   expect(detectRun('npm test')?.scope).toBe('full')
   expect(detectRun('go test ./...')?.scope).toBe('full')
